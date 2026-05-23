@@ -180,52 +180,52 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         return
 
-    context.user_data["pending_text"] = text
+    # обработка подтверждения рассылки
+    if context.user_data.get("pending_text"):
+        if text == "ПОДТВЕРЖДАЮ":
+            groups = await get_groups()
 
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "✅ Подтвердить",
-                callback_data="confirm_send"
-            ),
-            InlineKeyboardButton(
-                "❌ Отмена",
-                callback_data="cancel_send"
+            success, failed = await send_to_groups(
+                context.bot,
+                groups,
+                context.user_data["pending_text"]
             )
-        ]
-    ])
 
-    await update.message.reply_text(
-        "Отправить это во все группы?\n"
-        "Напишите ПОДТВЕРЖДАЮ или нажмите кнопку.",
-        reply_markup=keyboard
-    )
+            context.user_data.pop("pending_text", None)
+
+            await update.message.reply_text(
+                f"Рассылка завершена\n\n"
+                f"Успешно: {success}\n"
+                f"Ошибок: {failed}"
+            )
+
+            return
 
 
-async def confirm_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.text != "ПОДТВЕРЖДАЮ":
-        return
+# async def confirm_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+#     if update.message.text != "ПОДТВЕРЖДАЮ":
+#         return
 
-    text = context.user_data.get("pending_text")
+#     text = context.user_data.get("pending_text")
 
-    if not text:
-        return
+#     if not text:
+#         return
 
-    groups = await get_groups()
+#     groups = await get_groups()
 
-    success, failed = await send_to_groups(
-        context.bot,
-        groups,
-        text
-    )
+#     success, failed = await send_to_groups(
+#         context.bot,
+#         groups,
+#         text
+#     )
 
-    await update.message.reply_text(
-        f"Рассылка завершена\n\n"
-        f"Успешно: {success}\n"
-        f"Ошибок: {failed}"
-    )
+#     await update.message.reply_text(
+#         f"Рассылка завершена\n\n"
+#         f"Успешно: {success}\n"
+#         f"Ошибок: {failed}"
+#     )
 
-    context.user_data.pop("pending_text", None)
+#     context.user_data.pop("pending_text", None)
 
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -285,8 +285,17 @@ async def post_init(application):
     )
 
 
-async def main():
-    await ensure_files()
+def main():
+    import asyncio
+
+    asyncio.set_event_loop_policy(
+        asyncio.WindowsSelectorEventLoopPolicy()
+    )
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    loop.run_until_complete(ensure_files())
 
     app = (
         Application.builder()
@@ -303,29 +312,15 @@ async def main():
 
     app.add_handler(
         MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
-            confirm_text
-        )
-    )
-
-    app.add_handler(
-        MessageHandler(
-            filters.TEXT & ~filters.COMMAND,
+            filters.TEXT,
             handle_message
         )
     )
 
     logger.info("Bot started")
 
-    await app.run_polling()
+    app.run_polling()
 
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.set_event_loop_policy(
-        asyncio.WindowsSelectorEventLoopPolicy()
-    )
-
-    app = Application.builder().token(BOT_TOKEN).build()
-
-    app.run_polling()
+    main()
