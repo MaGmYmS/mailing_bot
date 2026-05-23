@@ -1,0 +1,5 @@
+config.py
+venv3.12/
+__pycache__/
+bot.log
+*.json
